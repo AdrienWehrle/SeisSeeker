@@ -730,57 +730,57 @@ class setup_detection:
             station = row["Name"]
             print(station)
             for channel in self.channels_to_use:
-                # try:
-                if hour:
-                    filename = os.path.join(
-                        mseed_dir,
-                        "".join(
-                            (
-                                "*",
-                                str(year),
-                                str(julday).zfill(3),
-                                "_",
-                                str(hour).zfill(2),
-                                "*",
-                                station,
-                                "*",
-                                channel,
-                                "*",
-                            )
-                        ),
-                    )
-                    print(filename)
-                    st_tmp = obspy.read(filename)
-                else:
-                    filename = os.path.join(
-                        mseed_dir,
-                        "".join(
-                            (
-                                "*",
-                                str(year),
-                                str(julday).zfill(3),
-                                "*",
-                                station,
-                                "*",
-                                channel,
-                                "*",
-                            )
-                        ),
-                    )
-                    print(filename)
-                    st_tmp = obspy.read(filename)
+                try:
+                    if hour:
+                        filename = os.path.join(
+                            mseed_dir,
+                            "".join(
+                                (
+                                    "*",
+                                    str(year),
+                                    str(julday).zfill(3),
+                                    "_",
+                                    str(hour).zfill(2),
+                                    "*",
+                                    station,
+                                    "*",
+                                    channel,
+                                    ".*",
+                                )
+                            ),
+                        )
+                        print(filename)
+                        st_tmp = obspy.read(filename)
+                    # else:
+                    #     filename = os.path.join(
+                    #         mseed_dir,
+                    #         "".join(
+                    #             (
+                    #                 "*",
+                    #                 str(year),
+                    #                 str(julday).zfill(3),
+                    #                 "*",
+                    #                 station,
+                    #                 "*",
+                    #                 channel,
+                    #                 ".*",
+                    #             )
+                    #         ),
+                    #     )
+                    #     print(filename)
+                    #     st_tmp = obspy.read(filename)
 
-                for tr in st_tmp:
-                    st.append(tr)
-                # except:
-                #     print(
-                #         "No data for "
-                #         + station
-                #         + ", channel = "
-                #         + channel
-                #         + ". Skipping this data."
-                #     )
-                #     continue
+                    for tr in st_tmp:
+                        st.append(tr)
+                except:
+                    print(
+                        "No data for "
+                        + station
+                        + ", channel = "
+                        + channel
+                        + ". Skipping this data."
+                    )
+                    continue
         # Merge data:
         st.detrend("demean")
         st.merge(method=1, fill_value=0.0)
@@ -789,10 +789,10 @@ class setup_detection:
             if self.freqmax:
                 st.filter("bandpass", freqmin=self.freqmin, freqmax=self.freqmax)
         # And trim data, if some lies outside start and end times:
-        if self.starttime > st[0].stats.starttime:
-            st.trim(starttime=self.starttime)
-        if self.endtime < st[0].stats.endtime:
-            st.trim(endtime=self.endtime)
+        # if self.starttime > st[0].stats.starttime:
+        #     st.trim(starttime=self.starttime)
+        # if self.endtime < st[0].stats.endtime:
+        #     st.trim(endtime=self.endtime)
         return st
 
     def _convert_st_to_np_data(self, st):
