@@ -46,11 +46,13 @@ remove_autocorr = True
 stations_fname = os.path.join("inputs", "AS_stations.txt")
 stations_df = pd.read_csv(stations_fname)
 
+# COM_AN: Change the stations input file to the correct names, coordinates and elevations
 
 # In[9]:
 
 
 # Specify date and time to search over:
+# COM_AN: Make sure that the starttime here matches the starttime of the data that you will be using.
 starttime = obspy.UTCDateTime("2020-01-01T01:30:46.000000Z")
 endtime = starttime + 5
 
@@ -61,7 +63,7 @@ endtime = starttime + 5
 
 
 # And find min and max distance (and hence frequency) for the array:
-vel_assumed = 1.9  # 3.8 #3.0
+vel_assumed = 1.65  # 1.9  # 3.8 #3.0 # COM_AN: This velocity is the assumed S wave velocity, we should change this to the expected surface wave velocity which is around 1.65 km/s
 inter_station_dists = []
 # Loop over first set of stations:
 for index, row in stations_df.iterrows():
@@ -131,7 +133,11 @@ outdir = "outputs"
 stations_fname = stations_fname
 starttime = starttime
 endtime = endtime
-channels_to_use = ["??Z", "??1", "??2"]
+channels_to_use = [
+    "??Z",
+    "??1",
+    "??2",
+]  # COM_AN: See if you want to adopt this naming or change it to somehting that matches our data a bit better. ususally channel 1 is East, channel 2 is North and channel Z is vertical. But we should try just on the vertical first as the sensors are not oriented..
 detect_obj = SeisSeeker.processing.setup_detection(
     archivedir,
     outdir,
@@ -141,13 +147,13 @@ detect_obj = SeisSeeker.processing.setup_detection(
     channels_to_use=channels_to_use,
 )
 # Specify array processing parameters:
-detect_obj.freqmin = 10
+detect_obj.freqmin = 10  # COM_AN: This is the frequency range that we are interested in, first try these values they seem reasonable, but we can adjust accordingly.
 detect_obj.freqmax = 150
 detect_obj.num_freqs = (
     20  # Set small for initial detection and larger for fine detail calculation...
 )
 detect_obj.max_sl = 1.0
-detect_obj.win_len_s = win_len_s  # 1 # Window to process within. Should be slowest time it might take for a ray to propagate through the entrie array
+detect_obj.win_len_s = win_len_s  # 1 # Window to process within. Should be slowest time it might take for a ray to propagate through the entrie array #COM_AN check if this makes sense, you can just use the max distance within the array and the surface wave speed to see what the time should be.
 detect_obj.win_step_inc_s = win_step_inc_s  # The step length between windows (overlap between windows is given by win_len_s - win_step_inc_s)
 detect_obj.remove_autocorr = True
 # detect_obj.nproc = 8 #1 # If not specified, will use all available processors.
@@ -229,8 +235,8 @@ else:
 
 
 # Locate events:
-receiver_vp = 2000  # 3900
-receiver_vs = 1000  # 2000
+receiver_vp = 2000  # 3900 COM_AN this is the P wave speed which seems slow, I think it is the apparent velocity when considering events coming from the base?. so maybe check with Tom.. why they took these values.. And change it to something that makes sense for our setup.
+receiver_vs = 1650  # 1000  # 2000 # COM_AN this is now the S waves peed but this should be changed to surface wave speed which is around 1.65 km/s
 array_latlon = [np.mean(stations_df["Latitude"]), np.mean(stations_df["Longitude"])]
 events_df = SeisSeeker.processing.location.locate_events_from_P_and_S_array_arrivals(
     events_df, LUTs_dict, array_latlon, receiver_vp, receiver_vs, verbosity=2
