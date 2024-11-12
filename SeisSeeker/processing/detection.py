@@ -803,6 +803,7 @@ class setup_detection:
 
     def _convert_st_to_np_data(self, st):
         """Function to convert data to numpy format for processing."""
+
         self.n_win = int(
             ((st[0].stats.endtime - self.win_pad_s) - st[0].stats.starttime)
             / self.win_step_inc_s
@@ -1034,6 +1035,15 @@ class setup_detection:
                                 ):
                                     continue
                             elif self.starttime.minute != minute:
+                                continue
+
+                            # move to next iteration if time is exceeding or matching endtime
+                            elif (
+                                obspy.UTCDateTime(
+                                    year=year, julday=julday, hour=hour, minute=minute
+                                )
+                                >= self.endtime
+                            ):
                                 continue
 
                             # Trim data:
@@ -1622,7 +1632,7 @@ class setup_detection:
                     label="Horizontal back-azimuth",
                 )
                 if len(events_df_all) > 0:
-                    axd[0].scatter(
+                    ax[0].scatter(
                         events_df_all["t1"],
                         np.ones(len(events_df_all)) * np.max(t_series_df_Z["power"]),
                         c="r",
@@ -1702,7 +1712,7 @@ class setup_detection:
             self.peaks_Z = peaks_Z
 
             # Find back-azimuths associated with phase picks:
-            peak_powers = t_series_df_Z["back_azi"].values[peaks_Z]
+            peak_powers = t_series_df_Z["power"].values[peaks_Z]
             peak_back_azimuths = t_series_df_Z["back_azi"].values[peaks_Z]
             peak_slownesses = t_series_df_Z["slowness"].values[peaks_Z]
             peak_times = t_series_df_Z["t"].values[peaks_Z]
@@ -1716,8 +1726,6 @@ class setup_detection:
                 }
             )
 
-            self.events_df = events_df
-
             if self.calc_uncertainties:
                 events_df = self._calc_uncertainties(
                     events_df, t_series_df_Z, t_series_df_hor, verbosity=verbosity
@@ -1726,28 +1734,35 @@ class setup_detection:
             # Plot detected, phase-associated picks:
             if verbosity > 1:
                 print("=" * 40)
-                print("Event phase associations:")
+                print("Peaks from vertical component only:")
                 print(events_df)
                 print("=" * 40)
                 fig, ax = plt.subplots(nrows=3, sharex=True, figsize=(6, 4))
                 # Plot power:
                 ax[0].plot(
-                    t_series_df_Z["time"],
-                    t_series_df_Z["power"],
-                    label="Vertical power",
+                    t_series_df_Z["t"], t_series_df_Z["power"], label="Vertical power",
                 )
                 # Plot slowness:
                 ax[1].plot(
-                    t_series_df_Z["time"],
+                    t_series_df_Z["t"],
                     t_series_df_Z["slowness"],
                     label="Vertical slowness",
                 )
                 # Plot back-azimuth:
                 ax[2].plot(
-                    t_series_df_Z["time"],
-                    t_series_df_Z["back_azimuth"],
+                    t_series_df_Z["t"],
+                    t_series_df_Z["back_azi"],
                     label="Vertical back-azimuth",
                 )
+                if len(events_df) > 0:
+                    ax[0].scatter(
+                        events_df["time"],
+                        events_df["power"],
+                        c="r",
+                        label="Surface wave picks",
+                    )
+                else:
+                    print("No events to plot.")
                 ax[0].legend()
                 ax[2].set_xlabel("Time")
                 ax[0].set_ylabel("Power (arb. units)")
