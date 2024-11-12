@@ -39,7 +39,7 @@ def flatten_list(l):
 def xy_to_rtheta(x, y):
     """x,y to r,theta, where x,y in East and North directions.
     Theta is in degrees from N."""
-    r = np.sqrt(x**2 + y**2)
+    r = np.sqrt(x ** 2 + y ** 2)
     theta = np.rad2deg(np.arctan2(x, y))
     try:
         theta[theta < 0] = theta[theta < 0] + 360
@@ -728,7 +728,6 @@ class setup_detection:
         st = obspy.Stream()
         for index, row in self.stations_df.iterrows():
             station = row["Name"]
-            print(station)
             for channel in self.channels_to_use:
                 try:
                     if hour:
@@ -751,6 +750,8 @@ class setup_detection:
                         )
                         print(filename)
                         st_tmp = obspy.read(filename)
+                        print(st_tmp)
+
                     # else:
                     #     filename = os.path.join(
                     #         mseed_dir,
@@ -788,11 +789,16 @@ class setup_detection:
         if self.freqmin:
             if self.freqmax:
                 st.filter("bandpass", freqmin=self.freqmin, freqmax=self.freqmax)
-        # And trim data, if some lies outside start and end times:
-        # if self.starttime > st[0].stats.starttime:
-        #     st.trim(starttime=self.starttime)
-        # if self.endtime < st[0].stats.endtime:
-        #     st.trim(endtime=self.endtime)
+
+        try:
+            # And trim data, if some lies outside start and end times:
+            if self.starttime > st[0].stats.starttime:
+                st.trim(starttime=self.starttime)
+            if self.endtime < st[0].stats.endtime:
+                st.trim(endtime=self.endtime)
+        except:  # should never be silenced but will fix later
+            print("silenced")
+
         return st
 
     def _convert_st_to_np_data(self, st):
@@ -891,7 +897,7 @@ class setup_detection:
 
         return t_series, powers, slownesses, back_azis
 
-    def _beamforming(self, st_trimmed, verbosity=0):
+    def _beamforming(self, st_trimmed, verbosity=2):
         """Function to perform beamforming, given a stream of data for a specific
         time-window. Function is primarily called by run_array_proc().
         Returns <Psum_all> (stacked 2D power-slowness space data)."""
@@ -903,9 +909,11 @@ class setup_detection:
             self.freqmin, self.freqmax, self.num_freqs
         )  # np.logspace(self.freqmin,self.freqmax,self.num_freqs)
         data = self._convert_st_to_np_data(st_trimmed)
+
         # Station locations:
         xx = self.stations_df["x_array_coords_km"].values
         yy = self.stations_df["y_array_coords_km"].values
+
         # And run:
         if verbosity > 1:
             print("Performing run for", data.shape[0], "windows")
@@ -994,6 +1002,7 @@ class setup_detection:
 
                         # Load data:
                         st = self._load_day_of_data(year, julday, hour=hour)
+
                         # starttime_this_day = obspy.UTCDateTime(year=year, julday=julday)
                         try:
                             starttime_this_st = st[0].stats.starttime
@@ -1059,6 +1068,7 @@ class setup_detection:
                             # Run array processing:
                             # (to get power in slowness space)
                             Psum_all = self._beamforming(st_trimmed)
+
                             del st_trimmed
                             gc.collect()
 
@@ -1421,8 +1431,9 @@ class setup_detection:
         events_df_all = pd.DataFrame()
         # Loop over array proc outdir data:
         for fname in glob.glob(
-            os.path.join(self.outdir, "detection_t_series_*_chZ.csv")
+            os.path.join(self.outdir, "detection_t_series_*_ch2.csv")
         ):
+
             f_uid = fname[-20:-8]
             # Check if in list to process:
             if fname in self.out_fnames_array_proc:
@@ -1430,24 +1441,29 @@ class setup_detection:
                 # Read in vertical data:
                 t_series_df_Z = pd.read_csv(fname)
                 # And read in horizontals:
+
                 try:
                     fname_N = os.path.join(
-                        self.outdir, "".join(("detection_t_series_", f_uid, "_chN.csv"))
+                        self.outdir,
+                        "".join(("detection_t_series_", f_uid, "_chN.csv")),
                     )
                     t_series_df_N = pd.read_csv(fname_N)
                 except FileNotFoundError:
                     fname_N = os.path.join(
-                        self.outdir, "".join(("detection_t_series_", f_uid, "_ch1.csv"))
+                        self.outdir,
+                        "".join(("detection_t_series_", f_uid, "_ch1.csv")),
                     )
                     t_series_df_N = pd.read_csv(fname_N)
                 try:
                     fname_E = os.path.join(
-                        self.outdir, "".join(("detection_t_series_", f_uid, "_chE.csv"))
+                        self.outdir,
+                        "".join(("detection_t_series_", f_uid, "_chE.csv")),
                     )
                     t_series_df_E = pd.read_csv(fname_E)
                 except FileNotFoundError:
                     fname_E = os.path.join(
-                        self.outdir, "".join(("detection_t_series_", f_uid, "_ch2.csv"))
+                        self.outdir,
+                        "".join(("detection_t_series_", f_uid, "_ch2.csv")),
                     )
                     t_series_df_E = pd.read_csv(fname_E)
             else:
@@ -1461,7 +1477,7 @@ class setup_detection:
                 continue
 
             # Check if all inputs are same length, and if not, skip file:
-            if not len(t_series_df_Z) == len(t_series_df_N) == len(t_series_df_E):
+            if not (len(t_series_df_Z) == len(t_series_df_N) == len(t_series_df_E)):
                 print(
                     "Warning: Files with f uid",
                     f_uid,
@@ -1518,6 +1534,7 @@ class setup_detection:
             mad_pick_threshold_Z = np.median(t_series_df_Z["power"].values) + (
                 self.mad_multiplier * self._calculate_mad(t_series_df_Z["power"])
             )
+
             mad_pick_threshold_hor = np.median(t_series_df_hor["power"].values) + (
                 self.mad_multiplier * self._calculate_mad(t_series_df_hor["power"])
             )
@@ -1530,11 +1547,13 @@ class setup_detection:
                     - obspy.UTCDateTime(t_series_df_Z["t"][0])
                 )
             )
+
             peaks_Z, _ = find_peaks(
                 t_series_df_Z["power"].values,
                 height=mad_pick_threshold_Z,
                 distance=min_pick_dist,
             )
+
             peaks_hor, _ = find_peaks(
                 t_series_df_hor["power"].values,
                 height=mad_pick_threshold_hor,
@@ -1542,6 +1561,7 @@ class setup_detection:
             )
 
             # Phase assoicate by BAZI threshold and max. power:
+
             events_df = _phase_associator(
                 t_series_df_Z,
                 t_series_df_hor,
@@ -1600,6 +1620,119 @@ class setup_detection:
                     t_series_df_hor["t"],
                     t_series_df_hor["back_azi"],
                     label="Horizontal back-azimuth",
+                )
+                if len(events_df_all) > 0:
+                    ax[0].scatter(
+                        events_df_all["t1"],
+                        np.ones(len(events_df_all)) * np.max(t_series_df_Z["power"]),
+                        c="r",
+                        label="P phase picks",
+                    )
+                    ax[0].scatter(
+                        events_df_all["t2"],
+                        np.ones(len(events_df_all)) * np.max(t_series_df_Z["power"]),
+                        c="b",
+                        label="S phase picks",
+                    )
+                else:
+                    print("No events to plot.")
+                ax[0].legend()
+                ax[2].set_xlabel("Time")
+                ax[0].set_ylabel("Power (arb. units)")
+                ax[1].set_ylabel("Slowness ($km$ $s^{-1}$)")
+                ax[2].set_ylabel("Back-azimuth ($^o$)")
+                # plt.gca().yaxis.set_major_locator(MaxNLocator(5))
+                for i in range(3):
+                    ax[i].xaxis.set_major_locator(plt.MaxNLocator(3))
+                plt.show()
+
+        return events_df_all
+
+    def detect_events_vertical_only(self, verbosity=0):
+        """Function to detect events, based on the power time-series generated
+        by run_array_proc(). Note: Currently, only Median Absolute Deviation
+        triggering is implemented.
+        Key attributes used are:
+        - mad_window_length_s
+        - mad_multiplier
+        - min_event_sep_s
+        """
+        print("Note: <mad_window_length_s> not yet implemented.")
+        # Create datastore:
+        events_df_all = pd.DataFrame()
+        # Loop over array proc outdir data:
+        for fname in glob.glob(
+            os.path.join(self.outdir, "detection_t_series_*_ch2.csv")
+        ):
+
+            f_uid = fname[-20:-8]
+            # Check if in list to process:
+            if fname in self.out_fnames_array_proc:
+                # And load in data:
+                # Read in vertical data:
+                t_series_df_Z = pd.read_csv(fname)
+                # And read in horizontals:
+            else:
+                continue  # Skip file, as not previously been processed.
+
+            # And check to see that t-series exists within file:
+            if len(t_series_df_Z) == 0:
+                continue
+
+            # Calculate pick thresholds:
+            mad_pick_threshold_Z = np.median(t_series_df_Z["power"].values) + (
+                self.mad_multiplier * self._calculate_mad(t_series_df_Z["power"])
+            )
+
+            # Get phase picks:
+            min_pick_dist = int(
+                self.min_event_sep_s
+                / (
+                    obspy.UTCDateTime(t_series_df_Z["t"][1])
+                    - obspy.UTCDateTime(t_series_df_Z["t"][0])
+                )
+            )
+
+            peaks_Z, _ = find_peaks(
+                t_series_df_Z["power"].values,
+                height=mad_pick_threshold_Z,
+                distance=min_pick_dist,
+            )
+
+            self.peaks_Z = peaks_Z
+            stop
+
+            # Find uncertainties (in time, bazi, slowness):
+            if self.calc_uncertainties:
+                events_df = self._calc_uncertainties(
+                    events_df, t_series_df_Z, t_series_df_hor, verbosity=verbosity
+                )
+
+            # Append to datastore:
+            events_df_all = events_df_all._append(events_df)
+
+            # Plot detected, phase-associated picks:
+            if verbosity > 1:
+                print("=" * 40)
+                print("Event phase associations:")
+                print(events_df)
+                print("=" * 40)
+                fig, ax = plt.subplots(nrows=3, sharex=True, figsize=(6, 4))
+                # Plot power:
+                ax[0].plot(
+                    t_series_df_Z["t"], t_series_df_Z["power"], label="Vertical power"
+                )
+                # Plot slowness:
+                ax[1].plot(
+                    t_series_df_Z["t"],
+                    t_series_df_Z["slowness"],
+                    label="Vertical slowness",
+                )
+                # Plot back-azimuth:
+                ax[2].plot(
+                    t_series_df_Z["t"],
+                    t_series_df_Z["back_azi"],
+                    label="Vertical back-azimuth",
                 )
                 if len(events_df_all) > 0:
                     ax[0].scatter(
